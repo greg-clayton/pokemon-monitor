@@ -1,0 +1,13 @@
+{
+  "name": "pokemon-center-monitor",
+  "version": "1.0.0",
+  "description": "Monitors Pokemon Center UK for queue activation and sends notifications",
+  "main": "monitor.js",
+  "scripts": {
+    "start": "node monitor.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "node-notifier": "^10.0.1"
+  }
+}
