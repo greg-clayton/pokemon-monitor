@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const notifier = require('node-notifier');
+const { exec } = require('child_process');
 
 puppeteer.use(StealthPlugin());
 
@@ -39,7 +40,16 @@ function log(msg) {
 
 function sendNotification(title, message) {
   log(`*** ${title} ***`);
-  notifier.notify({ title, message, sound: true, wait: false, appID: 'Pokemon Center Monitor' });
+
+  // Windows toast notification
+  notifier.notify({ title, message, sound: false, wait: false, appID: 'Pokemon Center Monitor' });
+
+  // Play system alert sound via PowerShell (reliable on all Windows 11 setups)
+  exec('powershell -c "[System.Media.SystemSounds]::Exclamation.Play()"');
+
+  // Repeat the sound 3 times so it's hard to miss
+  setTimeout(() => exec('powershell -c "[System.Media.SystemSounds]::Exclamation.Play()"'), 1000);
+  setTimeout(() => exec('powershell -c "[System.Media.SystemSounds]::Exclamation.Play()"'), 2000);
 }
 
 // ─── Browser ──────────────────────────────────────────────────────────────────
