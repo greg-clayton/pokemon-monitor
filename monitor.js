@@ -59,10 +59,15 @@ function playAlarm() {
   setTimeout(() => exec(cmd), 4000);
 }
 
+async function bringToFront() {
+  try { await page.bringToFront(); } catch (_) {}
+}
+
 function sendNotification(title, message) {
   log(`*** ${title} ***`);
   notifier.notify({ title, message, sound: false, wait: false, appID: 'Pokemon Center Monitor' });
   playAlarm();
+  bringToFront();
 }
 
 // ─── Human-like mouse helper ──────────────────────────────────────────────────
@@ -115,7 +120,6 @@ async function setup() {
     headless: false,
     args: [
       '--start-minimized',
-      '--window-position=-32000,-32000',
       '--no-sandbox',
       '--disable-blink-features=AutomationControlled',
     ],
