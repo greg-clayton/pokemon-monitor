@@ -134,6 +134,10 @@ async function checkSite() {
   checkCount++;
 
   try {
+    // Navigate away first so each visit is treated as a fresh entry, not a refresh
+    await page.goto('about:blank', { waitUntil: 'domcontentloaded', timeout: 10_000 });
+    await new Promise(r => setTimeout(r, 1000));
+
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
     // Wait for JS redirects to fire
