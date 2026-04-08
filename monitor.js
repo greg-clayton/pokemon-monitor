@@ -44,12 +44,11 @@ function sendNotification(title, message) {
   // Windows toast notification
   notifier.notify({ title, message, sound: false, wait: false, appID: 'Pokemon Center Monitor' });
 
-  // Play system alert sound via PowerShell (reliable on all Windows 11 setups)
-  exec('powershell -c "[System.Media.SystemSounds]::Question.Play()"');
-
-  // Repeat the sound 3 times so it's hard to miss
-  setTimeout(() => exec('powershell -c "[System.Media.SystemSounds]::Question.Play()"'), 1000);
-  setTimeout(() => exec('powershell -c "[System.Media.SystemSounds]::Question.Play()"'), 2000);
+  // Play alarm WAV 3 times so it's hard to miss
+  const playAlarm = () => exec('powershell -c "(New-Object System.Media.SoundPlayer \'C:\\Windows\\Media\\Alarm01.wav\').PlaySync()"');
+  playAlarm();
+  setTimeout(playAlarm, 2000);
+  setTimeout(playAlarm, 4000);
 }
 
 // ─── Browser ──────────────────────────────────────────────────────────────────
