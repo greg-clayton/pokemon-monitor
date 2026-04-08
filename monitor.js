@@ -21,17 +21,16 @@ const QUEUE_PATTERNS = [
   /waiting room/i,
 ];
 
-// Bot challenge / human verification patterns (PerimeterX, Cloudflare, etc.)
+// Imperva / hCaptcha challenge patterns
 const CHALLENGE_PATTERNS = [
-  /px-captcha/i,
-  /perimeterx/i,
+  /NOINDEX, NOFOLLOW/,
+  /incapsula/i,
+  /imperva/i,
+  /i am human/i,
+  /additional security check/i,
   /human verification/i,
-  /press.*hold/i,
   /just a moment/i,
   /checking if the site connection is secure/i,
-  /enable javascript and cookies to continue/i,
-  /verify.*human/i,
-  /NOINDEX, NOFOLLOW/,
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -66,6 +65,49 @@ function sendNotification(title, message) {
   playAlarm();
 }
 
+// ─── Human-like mouse helper ──────────────────────────────────────────────────
+function randomBetween(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+async function humanClick(pg, element) {
+  const box = await element.boundingBox();
+  if (!box) return;
+  const x = box.x + randomBetween(5, Math.max(6, box.width  - 5));
+  const y = box.y + randomBetween(5, Math.max(6, box.height - 5));
+  await pg.mouse.move(x, y, { steps: randomBetween(8, 15) });
+  await new Promise(r => setTimeout(r, randomBetween(80, 200)));
+  await pg.mouse.click(x, y);
+}
+
+// ─── Auto checkbox click ──────────────────────────────────────────────────────
+async function tryClickCheckbox(pg) {
+  try {
+    const mainIframeEl = await pg.$('#main-iframe');
+    if (!mainIframeEl) return;
+
+    const mainFrame = await mainIframeEl.contentFrame();
+    if (!mainFrame) return;
+
+    await mainFrame.waitForSelector('iframe[src*="hcaptcha"]', { timeout: 8000 });
+    const hcaptchaIframeEl = await mainFrame.$('iframe[src*="hcaptcha"]');
+    if (!hcaptchaIframeEl) return;
+
+    const hcaptchaFrame = await hcaptchaIframeEl.contentFrame();
+    if (!hcaptchaFrame) return;
+
+    await hcaptchaFrame.waitForSelector('#checkbox', { timeout: 8000 });
+    const checkbox = await hcaptchaFrame.$('#checkbox');
+    if (!checkbox) return;
+
+    log('hCaptcha checkbox found — clicking...');
+    await humanClick(pg, checkbox);
+    await new Promise(r => setTimeout(r, 4000));
+  } catch (e) {
+    log(`Checkbox click: ${e.message}`);
+  }
+}
+
 // ─── Browser setup ────────────────────────────────────────────────────────────
 async function setup() {
   browser = await puppeteer.launch({
@@ -78,7 +120,6 @@ async function setup() {
     ],
   });
 
-  // Use the first tab that Edge opens — keep it forever
   const pages = await browser.pages();
   page = pages[0] || await browser.newPage();
 
@@ -88,58 +129,6 @@ async function setup() {
   log('Edge ready — monitoring started.');
 }
 
-// ─── Human-like mouse helper ──────────────────────────────────────────────────
-function randomBetween(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-async function humanClick(pg, element) {
-  const box = await element.boundingBox();
-  if (!box) return;
-  // Move to a random point within the element
-  const x = box.x + randomBetween(5, Math.max(6, box.width  - 5));
-  const y = box.y + randomBetween(5, Math.max(6, box.height - 5));
-  await pg.mouse.move(x, y, { steps: randomBetween(8, 15) });
-  await new Promise(r => setTimeout(r, randomBetween(80, 200)));
-  await pg.mouse.click(x, y);
-}
-
-// ─── Challenge solver ─────────────────────────────────────────────────────────
-async function tryPassChallenge(pg) {
-  try {
-    // Challenge is inside Imperva's main iframe
-    const mainIframeEl = await pg.$('#main-iframe');
-    if (!mainIframeEl) return false;
-
-    const mainFrame = await mainIframeEl.contentFrame();
-    if (!mainFrame) return false;
-
-    log('Imperva iframe found — looking for hCaptcha...');
-
-    // hCaptcha renders inside its own nested iframe
-    await mainFrame.waitForSelector('iframe[src*="hcaptcha"]', { timeout: 8000 });
-    const hcaptchaIframeEl = await mainFrame.$('iframe[src*="hcaptcha"]');
-    if (!hcaptchaIframeEl) return false;
-
-    const hcaptchaFrame = await hcaptchaIframeEl.contentFrame();
-    if (!hcaptchaFrame) return false;
-
-    // Wait for the checkbox to appear inside hCaptcha
-    await hcaptchaFrame.waitForSelector('#checkbox', { timeout: 8000 });
-    const checkbox = await hcaptchaFrame.$('#checkbox');
-    if (!checkbox) return false;
-
-    log('hCaptcha checkbox found — clicking...');
-    await humanClick(pg, checkbox);
-    await new Promise(r => setTimeout(r, 4000));
-    return true;
-
-  } catch (e) {
-    log(`Challenge solver: ${e.message}`);
-    return false;
-  }
-}
-
 // ─── Main Check ───────────────────────────────────────────────────────────────
 async function checkSite() {
   checkCount++;
@@ -147,14 +136,11 @@ async function checkSite() {
   try {
     await page.goto(TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-    // Wait for JS redirects / challenges to render
+    // Wait for JS redirects to fire
     await new Promise(r => setTimeout(r, 4000));
 
-    // Attempt to auto-pass any checkbox challenge
-    await tryPassChallenge(page);
-
-    // Re-read page state after any challenge interaction
-    await new Promise(r => setTimeout(r, 2000));
+    // Auto-click the hCaptcha checkbox if challenge appears
+    await tryClickCheckbox(page);
 
     const finalUrl = page.url();
     const bodyHtml = await page.evaluate(() => document.documentElement?.innerHTML || '');
@@ -179,7 +165,7 @@ async function checkSite() {
       challengeActive = true;
       sendNotification(
         'Pokemon Center UK — High Traffic Alert!',
-        'Site is showing a human verification challenge — queue may be forming. Open your browser!'
+        'Security challenge detected — queue may be forming. Open your browser now!'
       );
 
     } else if (!isChallenge && challengeActive && !isQueued) {
@@ -197,7 +183,6 @@ async function checkSite() {
 
   } catch (err) {
     log(`Error on check #${checkCount}: ${err.message}`);
-    // Reconnect browser on error
     try { await browser.close(); } catch (_) {}
     browser = null;
     page    = null;
