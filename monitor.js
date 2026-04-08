@@ -106,31 +106,38 @@ async function humanClick(pg, element) {
 
 // ─── Challenge solver ─────────────────────────────────────────────────────────
 async function tryPassChallenge(pg) {
-  // Common checkbox selectors used by PerimeterX and similar
-  const checkboxSelectors = [
-    '#px-captcha',
-    'input[type="checkbox"]',
-    '[class*="captcha"] input',
-    '[id*="captcha"] input',
-    '[class*="challenge"] input',
-    'label[for*="human"]',
-    '[class*="checkbox"]',
-    'button[class*="check"]',
-  ];
+  try {
+    // Challenge is inside Imperva's main iframe
+    const mainIframeEl = await pg.$('#main-iframe');
+    if (!mainIframeEl) return false;
 
-  for (const selector of checkboxSelectors) {
-    try {
-      const el = await pg.$(selector);
-      if (el) {
-        log(`Challenge checkbox found (${selector}) — clicking...`);
-        await humanClick(pg, el);
-        // Wait to see if the challenge clears
-        await new Promise(r => setTimeout(r, 3000));
-        return true;
-      }
-    } catch (_) {}
+    const mainFrame = await mainIframeEl.contentFrame();
+    if (!mainFrame) return false;
+
+    log('Imperva iframe found — looking for hCaptcha...');
+
+    // hCaptcha renders inside its own nested iframe
+    await mainFrame.waitForSelector('iframe[src*="hcaptcha"]', { timeout: 8000 });
+    const hcaptchaIframeEl = await mainFrame.$('iframe[src*="hcaptcha"]');
+    if (!hcaptchaIframeEl) return false;
+
+    const hcaptchaFrame = await hcaptchaIframeEl.contentFrame();
+    if (!hcaptchaFrame) return false;
+
+    // Wait for the checkbox to appear inside hCaptcha
+    await hcaptchaFrame.waitForSelector('#checkbox', { timeout: 8000 });
+    const checkbox = await hcaptchaFrame.$('#checkbox');
+    if (!checkbox) return false;
+
+    log('hCaptcha checkbox found — clicking...');
+    await humanClick(pg, checkbox);
+    await new Promise(r => setTimeout(r, 4000));
+    return true;
+
+  } catch (e) {
+    log(`Challenge solver: ${e.message}`);
+    return false;
   }
-  return false;
 }
 
 // ─── Main Check ───────────────────────────────────────────────────────────────
