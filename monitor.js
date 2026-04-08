@@ -115,6 +115,7 @@ async function setup() {
     headless: false,
     args: [
       '--start-minimized',
+      '--window-position=-32000,-32000',
       '--no-sandbox',
       '--disable-blink-features=AutomationControlled',
     ],
