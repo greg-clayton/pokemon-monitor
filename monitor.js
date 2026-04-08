@@ -88,6 +88,51 @@ async function setup() {
   log('Edge ready — monitoring started.');
 }
 
+// ─── Human-like mouse helper ──────────────────────────────────────────────────
+function randomBetween(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+async function humanClick(pg, element) {
+  const box = await element.boundingBox();
+  if (!box) return;
+  // Move to a random point within the element
+  const x = box.x + randomBetween(5, Math.max(6, box.width  - 5));
+  const y = box.y + randomBetween(5, Math.max(6, box.height - 5));
+  await pg.mouse.move(x, y, { steps: randomBetween(8, 15) });
+  await new Promise(r => setTimeout(r, randomBetween(80, 200)));
+  await pg.mouse.click(x, y);
+}
+
+// ─── Challenge solver ─────────────────────────────────────────────────────────
+async function tryPassChallenge(pg) {
+  // Common checkbox selectors used by PerimeterX and similar
+  const checkboxSelectors = [
+    '#px-captcha',
+    'input[type="checkbox"]',
+    '[class*="captcha"] input',
+    '[id*="captcha"] input',
+    '[class*="challenge"] input',
+    'label[for*="human"]',
+    '[class*="checkbox"]',
+    'button[class*="check"]',
+  ];
+
+  for (const selector of checkboxSelectors) {
+    try {
+      const el = await pg.$(selector);
+      if (el) {
+        log(`Challenge checkbox found (${selector}) — clicking...`);
+        await humanClick(pg, el);
+        // Wait to see if the challenge clears
+        await new Promise(r => setTimeout(r, 3000));
+        return true;
+      }
+    } catch (_) {}
+  }
+  return false;
+}
+
 // ─── Main Check ───────────────────────────────────────────────────────────────
 async function checkSite() {
   checkCount++;
@@ -97,6 +142,12 @@ async function checkSite() {
 
     // Wait for JS redirects / challenges to render
     await new Promise(r => setTimeout(r, 4000));
+
+    // Attempt to auto-pass any checkbox challenge
+    await tryPassChallenge(page);
+
+    // Re-read page state after any challenge interaction
+    await new Promise(r => setTimeout(r, 2000));
 
     const finalUrl = page.url();
     const bodyHtml = await page.evaluate(() => document.documentElement?.innerHTML || '');
