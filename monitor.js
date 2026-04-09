@@ -7,7 +7,7 @@ puppeteer.use(StealthPlugin());
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const TARGET_URL  = 'https://www.pokemoncenter.com/en-gb/';
-const INTERVAL_MS = 10_000; // 10 seconds
+const INTERVAL_MS = 60_000; // 60 seconds
 const EDGE_PATH   = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 
 // Queue-it / waiting room patterns
