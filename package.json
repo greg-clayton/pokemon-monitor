@@ -4,7 +4,8 @@
   "description": "Monitors Pokemon Center UK for queue activation and sends notifications",
   "main": "monitor.js",
   "scripts": {
-    "start": "node monitor.js"
+    "start": "node monitor.js",
+    "server": "node server.js"
   },
   "dependencies": {
     "node-notifier": "^10.0.1",
